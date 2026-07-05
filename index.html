@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF 加密工具</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+    max-width: 920px; margin: 40px auto; padding: 0 20px; color: #1a1a1a;
+    line-height: 1.5;
+  }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+    .sub { color: #666; margin: 0 0 20px; font-size: 14px; }
+    details[open] > summary { margin-bottom: 8px; }
+  .tabs {
+    display: flex; gap: 4px; border-bottom: 1px solid #e5e5e5;
+    margin-bottom: 16px;
+  }
+  .tab {
+    background: none; border: none; padding: 10px 20px; font-size: 14px;
+    cursor: pointer; color: #666; font-family: inherit; font-weight: 500;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab:hover { color: #0066ff; }
+  .tab.active { color: #0066ff; border-bottom-color: #0066ff; }
+  .step {
+    border: 1px solid #e5e5e5; border-radius: 10px; padding: 20px;
+    margin-bottom: 14px; background: #fafafa;
+  }
+  .step h2 { font-size: 16px; margin: 0 0 12px; color: #333; font-weight: 600; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .drop {
+    border: 2px dashed #ccc; border-radius: 8px; padding: 20px;
+    text-align: center; cursor: pointer; background: white;
+    transition: all 0.2s; display: block;
+  }
+  .drop:hover, .drop.dragover { border-color: #0066ff; background: #f5f9ff; }
+  .drop input { display: none; }
+  .drop-flex { flex: 1; min-width: 200px; }
+  .drop-icon { font-size: 28px; margin-bottom: 4px; }
+  .file-list {
+    margin-top: 12px; font-size: 13px; max-height: 220px;
+    overflow-y: auto; background: #fff; padding: 8px 12px;
+    border-radius: 4px; border: 1px solid #e5e5e5;
+  }
+  .file-list .item {
+    padding: 3px 0; word-break: break-all;
+    display: flex; justify-content: space-between; gap: 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .file-list .item:last-child { border-bottom: none; }
+  .file-list .meta { color: #888; font-size: 12px; white-space: nowrap; }
+  .form-group { margin-top: 12px; }
+  .form-group label.lbl {
+    display: block; font-size: 13px; color: #555; margin-bottom: 4px;
+  }
+  .form-group label.lbl .req { color: #c0392b; }
+  input[type=password], input[type=text] {
+    padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;
+    font-size: 14px; font-family: inherit; width: 100%;
+  }
+  input[type=password]:focus, input[type=text]:focus {
+    outline: none; border-color: #0066ff;
+  }
+  button.primary {
+    background: #0066ff; color: white; border: none; padding: 10px 24px;
+    border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 500;
+  }
+  button.primary:disabled { background: #ccc; cursor: not-allowed; }
+  button.primary:hover:not(:disabled) { background: #0052cc; }
+  button.ghost {
+    background: white; color: #666; border: 1px solid #ccc;
+    padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  }
+  button.ghost:hover { border-color: #999; color: #333; }
+  .progress {
+    width: 100%; height: 8px; background: #e5e5e5;
+    border-radius: 4px; overflow: hidden; margin-top: 12px;
+  }
+  .progress-bar {
+    height: 100%; background: #0066ff; transition: width 0.15s; width: 0;
+  }
+  .status { margin-top: 8px; font-size: 13px; color: #555; }
+  .results { margin-top: 12px; }
+  .results .ok { color: #060; }
+  .results .err { color: #c0392b; }
+  .results .miss { color: #c88400; }
+  details { background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px 12px; }
+  details summary { cursor: pointer; user-select: none; font-weight: 500; }
+  .hidden { display: none !important; }
+  .hint { font-size: 12px; color: #888; margin-top: 4px; }
+  code { background: #f0f0f0; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+  .help-box {
+    margin-top: 14px; padding: 12px 16px; background: #f5f9ff;
+    border-radius: 6px; border-left: 3px solid #0066ff; font-size: 13px; color: #444;
+  }
+  .help-box b { color: #0066ff; }
+  .summary-text { font-size: 13px; color: #555; }
+  .file-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #fff; border: 1px solid #e5e5e5; border-radius: 20px;
+    padding: 6px 14px; font-size: 13px; margin-top: 12px;
+  }
+  .file-pill .x {
+    color: #999; cursor: pointer; font-size: 16px; line-height: 1;
+  }
+  .file-pill .x:hover { color: #c0392b; }
+</style>
+</head>
+<body>
+  <h1>📄 PDF 加密工具</h1>
+  <p class="sub">全本地运行 · 文件不上传任何服务器</p>
+
+  <div id="engineStatus" class="hint">⏳ 正在加载加密库（≈300KB，一次性）…</div>
+
+  <div id="mainUI" class="hidden">
+
+    <div class="tabs">
+      <button class="tab active" data-mode="batch">📦 批量加密</button>
+      <button class="tab" data-mode="single">🔐 单文件加密</button>
+    </div>
+
+    <!-- ════════ 批量模式 ════════ -->
+    <div class="mode" data-mode="batch">
+      <div class="step">
+        <h2>① 选 PDF · 生成密码表</h2>
+        <div class="row">
+          <label class="drop drop-flex" id="dirDrop">
+            <input type="file" id="dirInput" webkitdirectory>
+            <div class="drop-icon">📁</div>
+            <div><b>选择文件夹</b></div>
+            <div class="hint">自动列出里面所有 .pdf</div>
+          </label>
+          <label class="drop drop-flex" id="pdfDrop">
+            <input type="file" id="pdfInput" multiple accept=".pdf">
+            <div class="drop-icon">📄</div>
+            <div><b>选择多个 PDF</b></div>
+            <div class="hint">支持多选 / 拖入</div>
+          </label>
+        </div>
+        <div class="file-list hidden" id="pdfList"></div>
+        <div class="row" style="margin-top:14px">
+          <button class="primary" id="genCsvBtn" disabled>⬇️ 下载密码表 CSV</button>
+          <button class="ghost hidden" id="clearPdfBtn">清空列表</button>
+          <span class="summary-text" id="pdfSummary"></span>
+        </div>
+      </div>
+
+      <div class="step">
+        <h2>② 上传填好的密码表 · 加密</h2>
+        <label class="drop" id="csvDrop">
+          <input type="file" id="csvInput" accept=".csv,.xlsx,.xls">
+          <div style="font-size:15px;margin-bottom:6px">📊 拖入或点击选择</div>
+          <div class="hint">支持 <code>.csv</code> / <code>.xlsx</code> / <code>.xls</code> · 列：<code>name</code>（PDF 文件名，含 .pdf）/ <code>password</code>（打开密码）</div>
+        </label>
+        <div class="status hidden" id="csvInfo"></div>
+
+        <details style="margin-top:12px" open>
+          <summary>⚙️ 高级设置（管理员密码 + 权限细分）</summary>
+          <div style="padding:12px 0">
+            <div class="form-group">
+              <label class="lbl">管理员密码 <span class="req">*</span></label>
+              <input type="password" id="batchOwnerPass" placeholder="必填">
+              <div class="hint">拥有此密码的人可解除 PDF 权限限制。打开者用 <code>password</code> 列，<b>用户不需要知道管理员密码</b>。<b>不要跟用户密码相同</b>，否则失去双重保护意义。</div>
+            </div>
+
+            <div style="margin-top:14px">
+              <label class="lbl">权限细分 <span style="color:#888;font-weight:normal;font-size:12px">（取消勾选 = 禁止该操作；与单文件 tab 独立）</span></label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-top:6px">
+                <label><input type="checkbox" id="permPrintLow" checked> 打印（低分辨率）</label>
+                <label><input type="checkbox" id="permPrintHigh" checked> 打印（高分辨率）</label>
+                <label><input type="checkbox" id="permModify" checked> 修改文档内容</label>
+                <label><input type="checkbox" id="permCopy" checked> 复制 / 提取内容</label>
+                <label><input type="checkbox" id="permAnnotate" checked> 添加 / 修改注释</label>
+                <label><input type="checkbox" id="permForm" checked> 填写表单</label>
+                <label><input type="checkbox" id="permAssemble" checked> 文档组装</label>
+              </div>
+              <div class="hint" style="margin-top:6px">提示：高分辨率打印会自动启用低分辨率打印。表单 / 注释 / 组装 默认开启便于阅读；想严格控制就取消勾选。</div>
+              <button type="button" class="ghost" id="batchPermPreview" style="margin-top:8px">🔍 查看当前 P 字段（即将写入 PDF 的）</button>
+              <pre id="batchPermPreviewOut" style="margin-top:6px;padding:8px;background:#f5f5f5;border-radius:4px;font-size:12px;display:none"></pre>
+            </div>
+          </div>
+        </details>
+
+        <button class="primary" id="batchStartBtn" disabled style="margin-top:14px">🔒 开始加密</button>
+        <div class="progress hidden" id="batchProgressBox"><div class="progress-bar" id="batchProgressBar"></div></div>
+        <div class="status hidden" id="batchStatus"></div>
+        <div class="results hidden" id="batchResults"></div>
+      </div>
+
+      <div class="help-box">
+        <b>💡 批量流程</b><br>
+        ① 选 PDF 所在文件夹 → 下载 <code>passwords_*.csv</code> 模板<br>
+        ② 用 Excel/WPS/Numbers 打开 CSV，给每个 name 填上 password（身份证后 6 位）<br>
+        ③ 上传填好的 CSV → 点"开始加密" → 自动打包 zip 下载<br>
+        <span style="color:#888">表头不区分大小写，CSV 第一行必须是 <code>name,password</code>。</span>
+      </div>
+    </div>
+
+    <!-- ════════ 单文件模式 ════════ -->
+    <div class="mode hidden" data-mode="single">
+      <div class="step">
+        <h2>选 1 个 PDF · 输入密码 · 下载</h2>
+        <label class="drop" id="singlePdfDrop">
+          <input type="file" id="singlePdfInput" accept=".pdf">
+          <div class="drop-icon">📄</div>
+          <div style="font-size:15px;margin-bottom:4px"><b>选择 PDF</b> 或拖入</div>
+          <div class="hint">仅支持单个 .pdf 文件</div>
+        </label>
+        <div id="singleFilePill"></div>
+
+        <div class="form-group">
+          <label class="lbl">用户密码 <span class="req">*</span>（打开 PDF 用）</label>
+          <input type="password" id="singleUserPwd" placeholder="必填">
+        </div>
+
+        <div class="form-group">
+          <label class="lbl">管理员密码 <span class="req">*</span>（解除权限用）</label>
+          <input type="password" id="singleOwnerPass" placeholder="必填">
+          <div class="hint">打开者不需要知道。<b>不要跟用户密码相同</b>，否则失去双重保护意义。</div>
+        </div>
+
+        <details style="margin-top:6px">
+          <summary style="cursor:pointer;color:#0066ff;font-size:13px">⚙️ 权限细分（独立设置）</summary>
+          <div style="padding:8px 0">
+            <div style="margin:4px 0 8px;font-size:12px;color:#666">💡 单文件 tab 的权限设置与批量 tab 完全分开，互不影响。</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-top:4px">
+              <label><input type="checkbox" id="permPrintLow_single" checked> 打印（低分辨率）</label>
+              <label><input type="checkbox" id="permPrintHigh_single" checked> 打印（高分辨率）</label>
+              <label><input type="checkbox" id="permModify_single" checked> 修改文档内容</label>
+              <label><input type="checkbox" id="permCopy_single" checked> 复制 / 提取内容</label>
+              <label><input type="checkbox" id="permAnnotate_single" checked> 添加 / 修改注释</label>
+              <label><input type="checkbox" id="permForm_single" checked> 填写表单</label>
+              <label><input type="checkbox" id="permAssemble_single" checked> 文档组装</label>
+            </div>
+            <button type="button" class="ghost" id="singlePermPreview" style="margin-top:8px">🔍 查看当前 P 字段（即将写入 PDF 的）</button>
+            <pre id="singlePermPreviewOut" style="margin-top:6px;padding:8px;background:#f5f5f5;border-radius:4px;font-size:12px;display:none"></pre>
+          </div>
+        </details>
+
+        <button class="primary" id="singleStartBtn" disabled style="margin-top:14px">🔒 加密并下载</button>
+        <div class="status hidden" id="singleStatus"></div>
+      </div>
+
+      <div class="help-box">
+        <b>💡 单文件流程</b><br>
+        ① 选一个 PDF（拖入或点击）<br>
+        ② 输入用户密码（必填）<br>
+        ③ 点"加密并下载" → 浏览器自动下载 <code>原文件名_encrypted.pdf</code>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- asmcrypto.js: 纯 JS 密码学库，用于 SHA-256 key derivation (V=5 R=5) -->
+  <script src="https://cdn.jsdelivr.net/npm/asmcrypto.js@2.3.2/asmcrypto.all.es5.js"></script>
+
+  <!-- import map：让 pdf-encrypt-lite 内部能 import 'pdf-lib' -->
+  <script type="importmap">
+  {
+    "imports": {
+      "pdf-lib": "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.esm.js"
+    }
+  }
+  </script>
+
+<!-- 加密引擎：PDF V=5 R=5 AES-256 (PDF 2.0 / Acrobat X+) -->
+  <script type="module">
+    import { PDFDocument, PDFName, PDFHexString, PDFNumber } from 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.esm.js';
+
+    // ========== Hash & Cipher primitives ==========
+    // SHA-256 via asmcrypto.js (纯 JS, 比 WebCrypto SHA-256 快)
+    function sha256(data) {
+      const h = new asmCrypto.Sha256();
+      h.process(data);
+      h.finish();
+      return h.result;
+    }
+
+    // AES-256-CBC content encryption via WebCrypto (走 CPU AES-NI 硬件指令, 速度天花板)
+    let _aesKeyCache = new Map();
+    async function getAesKey(rawKey) {
+      const k = bytesToHex(rawKey);
+      if (_aesKeyCache.has(k)) return _aesKeyCache.get(k);
+      const ck = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-CBC' }, false, ['encrypt']);
+      _aesKeyCache.set(k, ck);
+      return ck;
+    }
+    async function aes256CbcEncrypt(rawKey, iv, paddedData) {
+      const ck = await getAesKey(rawKey);
+      return new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, ck, paddedData));
+    }
+
+    // AES-128-ECB 同步版 (用于 O value derivation 的 19 轮迭代)
+    function aes128EcbEncryptSync(key16, block16) {
+      if (block16.length !== 16) throw new Error('AES-128-ECB 块必须是 16 字节');
+      return new Uint8Array(asmCrypto.AES_ECB.encrypt(block16, key16, false));
+    }
+
+    // ========== Helpers ==========
+    const PADDING = new Uint8Array([0x28,0xBF,0x4E,0x5E,0x4E,0x75,0x8A,0x41,0x64,0x00,0x4E,0x56,0xFF,0xFA,0x01,0x08,0x2E,0x2E,0x00,0xB6,0xD0,0x68,0x3E,0x80,0x2F,0x0C,0xA9,0xFE,0x64,0x53,0x69,0x7A]);
+    function padPassword(p) {
+      const b = new TextEncoder().encode(p);
+      const out = new Uint8Array(32);
+      if (b.length >= 32) out.set(b.slice(0, 32));
+      else { out.set(b); out.set(PADDING.slice(0, 32 - b.length), b.length); }
+      return out;
+    }
+    function bytesToHex(b) {
+      return Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+    }
+    function pkcs7Pad(d) {
+      const p = 16 - (d.length % 16);
+      const out = new Uint8Array(d.length + p);
+      out.set(d); for (let i = d.length; i < out.length; i++) out[i] = p;
+      return out;
+    }
+    function uint32LE(n) {
+      return new Uint8Array([n & 0xFF, (n >> 8) & 0xFF, (n >> 16) & 0xFF, (n >>> 24) & 0xFF]);
+    }
+    function concatBytes(...arrays) {
+      const total = arrays.reduce((s, a) => s + a.length, 0);
+      const out = new Uint8Array(total);
+      let off = 0;
+      for (const a of arrays) { out.set(a, off); off += a.length; }
+      return out;
+    }
+
+    // ========== V=5 R=5 Algorithm 1: File encryption key ==========
+    // K = SHA-256(padded_user_pwd || O || P || fileId) iterated 50 times with i counter
+    // Output: 32 bytes (AES-256)
+    function computeEncryptionKey_v5(userPwd, ownerKey, permissions, fileId) {
+      const paddedPwd = padPassword(userPwd);
+      const input = concatBytes(paddedPwd, ownerKey, uint32LE(permissions), fileId);
+      let K = sha256(input);
+      for (let i = 1; i <= 50; i++) {
+        K = sha256(concatBytes(K, uint32LE(i)));
+      }
+      return K; // 32 bytes
+    }
+
+    // ========== V=5 R=5 Algorithm 2: Computing U (user key) ==========
+    // hash = SHA-256(padding || fileId)
+    // U = AES-256-ECB-encrypt each 16-byte block of hash using first 16 bytes of K as AES-128 key
+    // (ISO 32000-2 / Adobe Supplement; PDF 2.0 spec)
+    function computeUserKey_v5(encryptionKey, fileId) {
+      const hash = sha256(concatBytes(PADDING, fileId)); // 32 bytes
+      const aes128Key = encryptionKey.slice(0, 16);
+      const block1 = aes128EcbEncryptSync(aes128Key, hash.slice(0, 16));
+      const block2 = aes128EcbEncryptSync(aes128Key, hash.slice(16, 32));
+      return concatBytes(block1, block2); // 32 bytes
+    }
+
+    // ========== V=5 R=5 Algorithm 3: Computing O (owner key) ==========
+    // a. padded_owner_pwd = pad(owner_pwd, 32)
+    // b. hash = SHA-256(padded_owner_pwd)
+    // c. for i=1..50: hash = SHA-256(hash || uint32_LE(i))
+    // d. encryption_key = hash (32 bytes)
+    // e. padded_user_pwd = pad(user_pwd, 32)
+    // f. result = padded_user_pwd
+    // g. for round=1..19:
+    //      round_key_left  = encryption_key[0..16] XOR round (each byte)
+    //      round_key_right = encryption_key[16..32] XOR round
+    //      block1 = AES-128-ECB(round_key_left, result[0..16])
+    //      block2 = AES-128-ECB(round_key_right, result[16..32])
+    //      result = block1 || block2
+    // h. O = result
+    function computeOwnerKey_v5(ownerPwd, userPwd) {
+      const paddedOwner = padPassword(ownerPwd);
+      let hash = sha256(paddedOwner);
+      for (let i = 1; i <= 50; i++) {
+        hash = sha256(concatBytes(hash, uint32LE(i)));
+      }
+      const encryptionKey = hash; // 32 bytes
+
+      const paddedUser = padPassword(userPwd);
+      let result = new Uint8Array(paddedUser); // 32 bytes
+
+      const roundKeyLeft = new Uint8Array(16);
+      const roundKeyRight = new Uint8Array(16);
+
+      for (let round = 1; round <= 19; round++) {
+        for (let j = 0; j < 16; j++) {
+          roundKeyLeft[j] = encryptionKey[j] ^ round;
+          roundKeyRight[j] = encryptionKey[16 + j] ^ round;
+        }
+        const block1 = aes128EcbEncryptSync(roundKeyLeft, result.slice(0, 16));
+        const block2 = aes128EcbEncryptSync(roundKeyRight, result.slice(16, 32));
+        result.set(block1, 0);
+        result.set(block2, 16);
+      }
+
+      return result; // 32 bytes
+    }
+
+    // ========== V=5 R=5 Algorithm 4: Per-object encryption key ==========
+    // V >= 5 (PDF 1.7 extension level 3, Algorithm 3.1a): 直接用文件加密密钥 K,
+    //   不再按 objNum/genNum 派生。V=4 那种 SHA-256(K ‖ objNum ‖ genNum ‖ "sAlT") 是错的。
+    function computeObjectKey_v5(encryptionKey, objNum, genNum) {
+      return encryptionKey; // V=5 R=5: object key == file encryption key
+    }
+
+    // ========== Content encryption ==========
+    // V=5 R=5: each string/stream uses its own random 16-byte IV
+    // Strings:  IV (16 bytes) prepended to ciphertext
+    // Streams:  IV stored in /IV dict entry, ciphertext is obj.contents
+    async function encryptStringBytes(objKey, plainBytes) {
+      const iv = crypto.getRandomValues(new Uint8Array(16));
+      const enc = await aes256CbcEncrypt(objKey, iv, pkcs7Pad(plainBytes));
+      return concatBytes(iv, enc);
+    }
+    async function encryptStreamBytes(objKey, plainBytes) {
+      const iv = crypto.getRandomValues(new Uint8Array(16));
+      const enc = await aes256CbcEncrypt(objKey, iv, pkcs7Pad(plainBytes));
+      // V=5 R=5: 16-byte IV **前缀**到 stream 数据里 (不存 /IV dict), 这是 qpdf / Adobe 的标准做法
+      const out = new Uint8Array(16 + enc.length);
+      out.set(iv, 0);
+      out.set(enc, 16);
+      return out;
+    }
+
+    // ========== Recursively encrypt PDF string values ==========
+    // Skip: /Length, /Filter, /DecodeParms, /IV (这些是 PDF 结构元数据, 不加密)
+    // V=5 R=5 spec: 加密字符串一律用 hex string 存储, 避免 literal string 的 escape 问题
+    async function encryptStringsInObject(obj, objKey) {
+      if (!obj) return;
+      const name = obj.constructor?.name;
+      if (name === 'PDFString' || name === 'PDFHexString') {
+        // 统一转成 PDFHexString 存储 (V=5 spec 允许)
+        const enc = await encryptStringBytes(objKey, obj.asBytes());
+        obj.value = bytesToHex(enc);
+      } else if (name === 'PDFDict') {
+        for (const [key, value] of obj.entries()) {
+          const keyName = key.asString();
+          if (keyName !== '/Length' && keyName !== '/Filter' && keyName !== '/DecodeParms' && keyName !== '/IV') {
+            await encryptStringsInObject(value, objKey);
+          }
+        }
+      } else if (name === 'PDFArray') {
+        for (const e of obj.asArray()) await encryptStringsInObject(e, objKey);
+      }
+      // PDFRawStream 由主流程单独处理
+    }
+
+    // ========== V=5 R=5 standard parameter derivation ==========
+    // 参考: PDF 2.0 / ISO 32000-2 Algorithm 8-10
+    //   K     = random 32 bytes (file encryption key)
+    //   U     = SHA-256(user_pwd || user_validation_salt) || user_validation_salt || user_key_salt
+    //   UE    = AES-256-CBC(SHA-256(user_pwd || user_key_salt), IV=0, no-pad, K)
+    //   O     = SHA-256(owner_pwd || owner_validation_salt || U) || owner_validation_salt || owner_key_salt
+    //   OE    = AES-256-CBC(SHA-256(owner_pwd || owner_key_salt || U), IV=0, no-pad, K)
+    //   Perms = AES-256-CBC(K, IV=0, no-pad, perms_clear)
+    //   perms_clear = P[LE 4B] || 0xFF 0xFF 0xFF 0xFF || "T" (or "F") || "adb" || random[4B]
+
+    // AES-256-CBC 无填充加密 (用 asmcrypto, padding=false, IV 全零)
+    function aes256CbcNoPad(key32, data) {
+      const iv = new Uint8Array(16);
+      return new Uint8Array(asmCrypto.AES_CBC.encrypt(data, key32, false, iv));
+    }
+
+    function computeV5Parameters(userPwd, ownerPwd, permissions, encryptMetadata = true) {
+      // 1. 随机生成文件加密密钥 K (32 bytes) + 各种 salt
+      const K = crypto.getRandomValues(new Uint8Array(32));
+      const userValidationSalt = crypto.getRandomValues(new Uint8Array(8));
+      const userKeySalt = crypto.getRandomValues(new Uint8Array(8));
+      const ownerValidationSalt = crypto.getRandomValues(new Uint8Array(8));
+      const ownerKeySalt = crypto.getRandomValues(new Uint8Array(8));
+
+      const userPwdBytes = new TextEncoder().encode(userPwd);
+      const ownerPwdBytes = new TextEncoder().encode(ownerPwd || userPwd);
+
+      // 2. U = SHA-256(userPwd || userValidationSalt) || userValidationSalt || userKeySalt  (48 bytes)
+      const U_hash = sha256(concatBytes(userPwdBytes, userValidationSalt));
+      const U = concatBytes(U_hash, userValidationSalt, userKeySalt);
+
+      // 3. UE = AES-256-CBC(SHA-256(userPwd || userKeySalt), IV=0, no-pad, K)  (32 bytes)
+      const userIntermediateKey = sha256(concatBytes(userPwdBytes, userKeySalt));
+      const UE = aes256CbcNoPad(userIntermediateKey, K);
+
+      // 4. O = SHA-256(ownerPwd || ownerValidationSalt || U) || ownerValidationSalt || ownerKeySalt  (48 bytes)
+      const O_hash = sha256(concatBytes(ownerPwdBytes, ownerValidationSalt, U));
+      const O = concatBytes(O_hash, ownerValidationSalt, ownerKeySalt);
+
+      // 5. OE = AES-256-CBC(SHA-256(ownerPwd || ownerKeySalt || U), IV=0, no-pad, K)  (32 bytes)
+      const ownerIntermediateKey = sha256(concatBytes(ownerPwdBytes, ownerKeySalt, U));
+      const OE = aes256CbcNoPad(ownerIntermediateKey, K);
+
+      // 6. Perms_clear = P[LE 4B] || 0xFF*4 || "T" (or "F") || "adb" || random[4B]  (16 bytes)
+      const permsClear = new Uint8Array(16);
+      permsClear[0] = permissions & 0xFF;
+      permsClear[1] = (permissions >> 8) & 0xFF;
+      permsClear[2] = (permissions >> 16) & 0xFF;
+      permsClear[3] = (permissions >>> 24) & 0xFF;
+      permsClear[4] = 0xFF; permsClear[5] = 0xFF; permsClear[6] = 0xFF; permsClear[7] = 0xFF;
+      permsClear[8] = encryptMetadata ? 0x54 : 0x46; // 'T' or 'F'
+      permsClear[9] = 0x61;  // 'a'
+      permsClear[10] = 0x64; // 'd'
+      permsClear[11] = 0x62; // 'b'
+      const randTail = crypto.getRandomValues(new Uint8Array(4));
+      permsClear.set(randTail, 12);
+
+      // 7. Perms = AES-256-CBC(K, IV=0, no-pad, permsClear)  (16 bytes)
+      const Perms = aes256CbcNoPad(K, permsClear);
+
+      return { K, O, U, OE, UE, Perms };
+    }
+
+    // ========== Main encrypt function ==========
+    async function encryptPDF_AES256(pdfBytes, userPwd, ownerPwd, permissions = 0xFFFFFFFC) {
+      const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true, updateMetadata: false });
+      const context = pdfDoc.context;
+      const trailer = context.trailerInfo;
+
+      // File ID — 必须 16 字节 (PDF 规范要求)
+      let fileIdFirst;
+      const idArray = trailer.ID;
+      if (idArray && Array.isArray(idArray) && idArray.length > 0) {
+        const idStr = idArray[0].toString().replace(/^<|>$/g, '');
+        const raw = new Uint8Array(idStr.match(/.{2}/g).map(h => parseInt(h, 16)));
+        if (raw.length >= 16) {
+          fileIdFirst = raw.slice(0, 16);
+        } else {
+          fileIdFirst = new Uint8Array(16);
+          fileIdFirst.set(raw);
+        }
+      } else {
+        fileIdFirst = crypto.getRandomValues(new Uint8Array(16));
+      }
+      const fileIdSecond = crypto.getRandomValues(new Uint8Array(16));
+      trailer.ID = [
+        PDFHexString.of(bytesToHex(fileIdFirst)),
+        PDFHexString.of(bytesToHex(fileIdSecond))
+      ];
+
+      // V=5 R=5 标准参数派生 (返回 K 作为文件加密密钥, 以及 O/U/OE/UE/Perms 字典字段)
+      // permissions: 32-bit 无符号整数, 由 UI 复选框生成 (默认 0xFFFFFFFC = 全开)
+      const v5 = computeV5Parameters(userPwd, ownerPwd || userPwd, permissions, true);
+      const encryptionKey = v5.K;
+
+      // 加密所有间接对象 — 用 K 作为基础 key
+      const indirectObjects = context.enumerateIndirectObjects();
+      for (const [ref, obj] of indirectObjects) {
+        const objNum = ref.objectNumber;
+        const genNum = ref.generationNumber || 0;
+        const objKey = computeObjectKey_v5(encryptionKey, objNum, genNum);
+
+        const name = obj.constructor?.name;
+
+        if (name !== 'PDFRawStream') {
+          await encryptStringsInObject(obj, objKey);
+        } else {
+          const out = await encryptStreamBytes(objKey, obj.contents);
+          obj.contents = out;
+          if (obj.dict) {
+            // V=5 R=5: 不写 /IV dict, IV 已经在 stream 数据前缀里
+            obj.dict.set(PDFName.of('Length'), PDFNumber.of(out.length));
+            await encryptStringsInObject(obj.dict, objKey);
+          }
+        }
+      }
+
+      // /Encrypt dictionary — V=5 R=5 AESV3 (完整字段: O/U/OE/UE/Perms)
+      const stdCF = context.obj({
+        CFM: PDFName.of('AESV3'),
+        Length: PDFNumber.of(256),
+        AuthEvent: PDFName.of('DocOpen')
+      });
+      const cf = context.obj({ StdCF: stdCF });
+      const encryptDict = context.obj({
+        Filter: PDFName.of('Standard'),
+        V: PDFNumber.of(5),
+        R: PDFNumber.of(5),
+        Length: PDFNumber.of(256),
+        P: PDFNumber.of(permissions),
+        O: PDFHexString.of(bytesToHex(v5.O)),
+        U: PDFHexString.of(bytesToHex(v5.U)),
+        OE: PDFHexString.of(bytesToHex(v5.OE)),
+        UE: PDFHexString.of(bytesToHex(v5.UE)),
+        Perms: PDFHexString.of(bytesToHex(v5.Perms)),
+        CF: cf,
+        StrF: PDFName.of('StdCF'),
+        StmF: PDFName.of('StdCF')
+      });
+      const encryptRef = context.register(encryptDict);
+      trailer.Encrypt = encryptRef;
+
+      return await pdfDoc.save({ useObjectStreams: false });
+    }
+
+    window.__encryptPDF = encryptPDF_AES256;
+
+    // Dev helper: end-to-end permission test (called from console/Puppeteer)
+    window.__e2eSaveAll = async function() {
+      const r = await fetch('pdfs/' + encodeURIComponent('针对主题“大数据物联网_具身智能_在学术数据库进行文献检索，....pdf'));
+      const pdfBytes = new Uint8Array(await r.arrayBuffer());
+      const cases = [
+        { name: 'all', P: 0xFFFFFFFC },
+        { name: 'only-print', P: (0xFFFFFFFC & ~(0x10000000|0x08000000|0x04000000|0x00800000|0x00200000)) | 0x20000000 | 0x00100000 },
+        { name: 'no-copy', P: 0xFFFFFFFC & ~(0x10000000|0x08000000) },
+      ];
+      const out = [];
+      for (const c of cases) {
+        const enc = await window.__encryptPDF(pdfBytes, 'UserPwd', 'AdminPwd', c.P);
+        const ab = new Uint8Array(enc);
+        const saveR = await fetch('http://localhost:8767/save', {
+          method: 'POST',
+          body: ab,
+          headers: {'Content-Type':'application/pdf', 'X-Filename': 'perm_' + c.name + '.pdf'}
+        });
+        const resp = JSON.parse(await saveR.text());
+        out.push({ name: c.name, P: c.P, saved: resp.saved, size: ab.length });
+      }
+      return out;
+    };
+
+    window.__e2ePermTest = async function() {
+      // Lazy-load pdf.js
+      if (!window.pdfjsLib) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          s.onload = () => {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            res();
+          };
+          s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+      const r = await fetch('pdfs/' + encodeURIComponent('针对主题“大数据物联网_具身智能_在学术数据库进行文献检索，....pdf'));
+      const pdfBytes = new Uint8Array(await r.arrayBuffer());
+      const cases = [
+        { name: 'all', P: 0xFFFFFFFC },
+        { name: 'only-print', P: (0xFFFFFFFC & ~(0x10000000|0x08000000|0x04000000|0x00800000|0x00200000)) | 0x20000000 | 0x00100000 },
+        { name: 'no-copy-no-modify', P: 0xFFFFFFFC & ~(0x10000000|0x08000000) },
+        { name: 'comment-only', P: 0xFFFFFFFC & ~(0x20000000|0x00100000|0x00800000|0x00200000) },
+      ];
+      const out = [];
+      for (const c of cases) {
+        const enc = await window.__encryptPDF(pdfBytes, 'UserPwd', 'AdminPwd', c.P);
+        const encU8 = new Uint8Array(enc);
+        const pdfDoc = await PDFDocument.load(enc, { ignoreEncryption: true, updateMetadata: false });
+        const ctx = pdfDoc.context;
+        const eD = ctx.lookup(ctx.trailerInfo.Encrypt);
+        const actualP = eD.get(PDFName.of('P')).numberValue;
+        const V = eD.get(PDFName.of('V')).numberValue;
+        const R = eD.get(PDFName.of('R')).numberValue;
+        const UE = String(eD.get(PDFName.of('UE'))).replace(/[<>]/g, '').length / 2;
+        const Perms = String(eD.get(PDFName.of('Perms'))).replace(/[<>]/g, '').length / 2;
+        const pMatch = (actualP >>> 0) === (c.P >>> 0);
+        const pd = await pdfjsLib.getDocument({ data: new Uint8Array(enc), password: 'UserPwd' }).promise;
+        const ops = await (await pd.getPage(1)).getOperatorList();
+        let wrongPwdOK = false;
+        try { await pdfjsLib.getDocument({ data: new Uint8Array(enc), password: 'WrongPwd' }).promise; }
+        catch (e) { wrongPwdOK = true; }
+        out.push({
+          name: c.name,
+          P_set: '0x' + (c.P >>> 0).toString(16).padStart(8, '0').toUpperCase(),
+          P_actual: '0x' + (actualP >>> 0).toString(16).padStart(8, '0').toUpperCase(),
+          pMatch, V, R, UE, Perms, size: encU8.length,
+          pages: pd.numPages, ops: ops.fnArray.length,
+          pdfjsOK: ops.fnArray.length > 0,
+          wrongPwdRejected: wrongPwdOK,
+        });
+      }
+      return out;
+    };
+    const engineStatus = document.getElementById('engineStatus');
+    engineStatus.textContent = '✅ 加密引擎就绪';
+    document.getElementById('mainUI').classList.remove('hidden');
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <script>
+    /* ════════ tab 切换 ════════ */
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.mode').forEach(m => m.classList.toggle('hidden', m.dataset.mode !== mode));
+      });
+    });
+
+    /* ════════ 工具函数 ════════ */
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+    function basename(path) {
+      const i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+      return i >= 0 ? path.slice(i + 1) : path;
+    }
+    function setupDrop(dropId, handler) {
+      const drop = document.getElementById(dropId);
+      const input = drop.querySelector('input[type=file]');
+      // <label> 包裹 <input> 时点击会自动触发一次 input.click()，不要再手动调
+      ['dragenter','dragover'].forEach(ev =>
+        drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('dragover'); })
+      );
+      ['dragleave','drop'].forEach(ev =>
+        drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('dragover'); })
+      );
+      drop.addEventListener('drop', e => handler(Array.from(e.dataTransfer.files)));
+      input.addEventListener('change', e => handler(Array.from(input.files)));
+    }
+
+    /* ════════ 加密函数（统一用 pdf-encrypt-lite） ════════ */
+
+    // ====== 权限位计算 ======
+    // PDF 1.7 spec Table 22: P 字段的 bit 定义（从右往左 bit 1 起始）
+    //   bit 3  (0x20000000) 打印（低分辨率）
+    //   bit 4  (0x10000000) 修改文档内容
+    //   bit 5  (0x08000000) 复制 / 提取内容
+    //   bit 6  (0x04000000) 添加 / 修改注释
+    //   bit 9  (0x00800000) 填写表单
+    //   bit 11 (0x00200000) 文档组装
+    //   bit 12 (0x00100000) 打印（高分辨率），自动含 bit 3
+    function getPermissionsFromUI(suffix = '') {
+      // PDF spec Table 22: 标准 R-bit 位置（1-indexed from LSB）
+      //   R3  (低分辨率打印) = 0x00000008
+      //   R4  (修改文档)     = 0x00000010
+      //   R5  (复制/提取)    = 0x00000020
+      //   R6  (注释)         = 0x00000040
+      //   R9  (表单)         = 0x00000200
+      //   R11 (文档组装)     = 0x00000800
+      //   R12 (高分辨率打印) = 0x00001000
+      const flagLow  = 0x00000008;  // R3  低分辨率打印
+      const flagHigh = 0x00001000;  // R12 高分辨率打印
+      const flagMod  = 0x00000010;  // R4  修改文档内容
+      const flagCopy = 0x00000020;  // R5  复制/提取
+      const flagAnn  = 0x00000040;  // R6  添加/修改注释
+      const flagForm = 0x00000200;  // R9  填写表单
+      const flagAsm  = 0x00000800;  // R11 文档组装
+      // 默认保留前 2 个 reserved 位（bit 1, 2）+ 最低 2 位清零（= 0xFFFFFFFC 等价 signed -4）
+      let P = 0xFFFFFFFC;
+      // 把未勾选的 bit 清掉
+      const checkLow  = document.getElementById('permPrintLow' + suffix);
+      const checkHigh = document.getElementById('permPrintHigh' + suffix);
+      const checkMod  = document.getElementById('permModify' + suffix);
+      const checkCopy = document.getElementById('permCopy' + suffix);
+      const checkAnn  = document.getElementById('permAnnotate' + suffix);
+      const checkForm = document.getElementById('permForm' + suffix);
+      const checkAsm  = document.getElementById('permAssemble' + suffix);
+      if (checkLow && !checkLow.checked)  P &= ~flagLow;
+      if (checkHigh && !checkHigh.checked) P &= ~flagHigh;
+      if (checkMod && !checkMod.checked)  P &= ~flagMod;
+      if (checkCopy && !checkCopy.checked) P &= ~flagCopy;
+      if (checkAnn && !checkAnn.checked)  P &= ~flagAnn;
+      if (checkForm && !checkForm.checked) P &= ~flagForm;
+      if (checkAsm && !checkAsm.checked)  P &= ~flagAsm;
+      // PDF reader 行为: 允许高质量打印 ⇒ 必定允许低质量（高质是低质的超集）
+      if (P & flagHigh) P |= flagLow;
+      return P >>> 0;  // 转成无符号 32 位
+    }
+
+    // 两个 tab 的权限复选框完全独立：
+    //   批量 tab 勾什么就用什么
+    //   单文件 tab 勾什么就用什么
+    //   没有任何自动同步机制
+    function setupPermissionSync() {
+      // 留着空架子，便于将来扩展；现在什么都不做
+    }
+    setupPermissionSync();
+
+    // P 字段预览工具 —— 直接显示"我即将写入 PDF 的权限字段"
+    // 用户可以在加密前看到效果，避免"加完发现权限不对"的反复试错
+    function previewPermissions(suffix = '') {
+      const ids = ['permPrintLow','permPrintHigh','permModify','permCopy','permAnnotate','permForm','permAssemble'];
+      const labels = {
+        permPrintLow:   '打印（低分辨率）',
+        permPrintHigh:  '打印（高分辨率）',
+        permModify:     '修改文档内容',
+        permCopy:       '复制 / 提取',
+        permAnnotate:   '添加 / 修改注释',
+        permForm:       '填写表单',
+        permAssemble:   '文档组装',
+      };
+      const flags = {
+        permPrintLow:   0x00000008,  // R3
+        permPrintHigh:  0x00001000,  // R12
+        permModify:     0x00000010,  // R4
+        permCopy:       0x00000020,  // R5
+        permAnnotate:   0x00000040,  // R6
+        permForm:       0x00000200,  // R9
+        permAssemble:   0x00000800,  // R11
+      };
+      const lines = [];
+      lines.push('━━━ 你的复选框 ━━━');
+      for (const id of ids) {
+        const el = document.getElementById(id + suffix);
+        lines.push(`  [${el.checked ? '☑' : '☐'}] ${labels[id]}  → 在 PDF reader 里 "${labels[id].split(' ')[0]}"复选框会${el.checked ? '☑（允许）' : '☐（禁止）'}`);
+      }
+      const P = getPermissionsFromUI(suffix);
+      lines.push('');
+      lines.push('━━━ 32-bit P 字段 ━━━');
+      lines.push(`  0x${(P >>> 0).toString(16).toUpperCase().padStart(8, '0')}`);
+      lines.push(`  二进制: ${(P >>> 0).toString(2).padStart(32, '0')}`);
+      lines.push('');
+      lines.push('━━━ PDF reader 里看到的 ━━━');
+      lines.push('  Adobe Reader / 福昕 / WPS 的"权限"对话框：');
+      lines.push('  ☑ = 允许（bit 设 1）  ☐ = 禁止（bit 设 0）');
+      for (const id of ids) {
+        const bit = (P & flags[id]) !== 0;
+        lines.push(`    [${bit ? '☑' : '☐'}] ${labels[id]}`);
+      }
+      return lines.join('\n');
+    }
+    // 绑定两个 preview 按钮
+    (function bindPreviewBtns() {
+      const b1 = document.getElementById('batchPermPreview');
+      const o1 = document.getElementById('batchPermPreviewOut');
+      if (b1 && o1) {
+        b1.addEventListener('click', () => {
+          o1.textContent = previewPermissions('');
+          o1.style.display = o1.style.display === 'none' ? 'block' : 'none';
+        });
+      }
+      const b2 = document.getElementById('singlePermPreview');
+      const o2 = document.getElementById('singlePermPreviewOut');
+      if (b2 && o2) {
+        b2.addEventListener('click', () => {
+          o2.textContent = previewPermissions('_single');
+          o2.style.display = o2.style.display === 'none' ? 'block' : 'none';
+        });
+      }
+    })();
+
+    async function encryptOne(file, userPwd, ownerPwd, permissions = 0xFFFFFFFC) {
+      if (!window.__encryptPDF) throw new Error('加密库未就绪');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      return await window.__encryptPDF(bytes, userPwd, ownerPwd || undefined, permissions);
+    }
+
+    /* ════════════════════════════════════════════════
+       批量模式
+       ════════════════════════════════════════════════ */
+    const dirInput    = document.getElementById('dirInput');
+    const pdfInput    = document.getElementById('pdfInput');
+    const pdfList     = document.getElementById('pdfList');
+    const pdfSummary  = document.getElementById('pdfSummary');
+    const genCsvBtn   = document.getElementById('genCsvBtn');
+    const clearPdfBtn = document.getElementById('clearPdfBtn');
+    const csvInput    = document.getElementById('csvInput');
+    const csvInfo     = document.getElementById('csvInfo');
+    const batchStartBtn    = document.getElementById('batchStartBtn');
+    const batchOwnerPass   = document.getElementById('batchOwnerPass');
+    const batchProgressBox = document.getElementById('batchProgressBox');
+    const batchProgressBar = document.getElementById('batchProgressBar');
+    const batchStatusEl    = document.getElementById('batchStatus');
+    const batchResultsEl   = document.getElementById('batchResults');
+
+    let batchPdfFiles = [];
+    let nameToPwd = {};
+
+    function addBatchPdfs(files) {
+      const pdfs = files.filter(f => /\.pdf$/i.test(f.name));
+      if (pdfs.length === 0) { alert('所选文件夹里没有 .pdf 文件'); return; }
+      const map = new Map();
+      batchPdfFiles.forEach(item => map.set(item.name, item));
+      let collisions = 0;
+      for (const f of pdfs) {
+        const key = basename(f.webkitRelativePath || f.name);
+        if (map.has(key)) { collisions++; continue; }
+        map.set(key, { name: key, file: f, size: f.size });
+      }
+      // 按文件最后修改时间升序排序
+      batchPdfFiles = Array.from(map.values()).sort((a, b) => {
+        const am = a.file.lastModified || 0;
+        const bm = b.file.lastModified || 0;
+        if (am !== bm) return am - bm;
+        return a.name.localeCompare(b.name, 'zh-Hans-CN');
+      });
+      if (collisions > 0) console.warn(`${collisions} 个同名文件被合并`);
+      renderBatchPdfList();
+    }
+    setupDrop('dirDrop', files => addBatchPdfs(files));
+    setupDrop('pdfDrop', files => addBatchPdfs(files));
+
+    function renderBatchPdfList() {
+      if (batchPdfFiles.length === 0) {
+        pdfList.classList.add('hidden');
+        clearPdfBtn.classList.add('hidden');
+        genCsvBtn.disabled = true;
+        pdfSummary.innerHTML = '';
+        return;
+      }
+      pdfList.classList.remove('hidden');
+      clearPdfBtn.classList.remove('hidden');
+      pdfList.innerHTML = batchPdfFiles.map(item =>
+        `<div class="item">
+          <span>📄 ${escapeHtml(item.name)}</span>
+          <span class="meta">${(item.size/1024).toFixed(1)} KB</span>
+        </div>`
+      ).join('');
+      const totalMB = batchPdfFiles.reduce((s,i)=>s+i.size,0)/1024/1024;
+      pdfSummary.innerHTML = `共 <b>${batchPdfFiles.length}</b> 个文件 · 总大小 <b>${totalMB.toFixed(2)} MB</b>`;
+      genCsvBtn.disabled = !window.__encryptPDF;
+    }
+    clearPdfBtn.addEventListener('click', () => {
+      if (!confirm('确定清空 PDF 列表？')) return;
+      batchPdfFiles = [];
+      renderBatchPdfList();
+    });
+
+    genCsvBtn.addEventListener('click', () => {
+      if (batchPdfFiles.length === 0) return;
+      const lines = ['name,password'];
+      batchPdfFiles.forEach(item => {
+        const name = item.name;
+        const needsQuote = /[",\n\r]/.test(name);
+        const escaped = needsQuote ? `"${name.replace(/"/g, '""')}"` : name;
+        lines.push(`${escaped},`);
+      });
+      const blob = new Blob(["\uFEFF" + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const fname = `passwords_${new Date().toISOString().slice(0,10)}.csv`;
+      saveAs(blob, fname);
+    });
+
+    setupDrop('csvDrop', files => {
+      if (files.length === 0) return;
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const bytes = new Uint8Array(e.target.result);
+          let text;
+          try { text = new TextDecoder('utf-8').decode(bytes); }
+          catch (_) { text = new TextDecoder('gbk').decode(bytes); }
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+          const isCsv = /\.csv$/i.test(file.name);
+          const wb = XLSX.read(text, { type: isCsv ? 'string' : 'array', raw: false });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+          if (rows.length === 0) {
+            csvInfo.innerHTML = '❌ 表格里没有数据';
+            csvInfo.classList.remove('hidden');
+            nameToPwd = {}; checkBatchReady(); return;
+          }
+          const first = rows[0];
+          const keys = Object.keys(first);
+          const nameKey = keys.find(k => /^(name|file|filename|文件名|文件)$/i.test(k)) || keys[0];
+          const pwdKey  = keys.find(k => /^(password|passwd|pwd|密码)$/i.test(k)) || keys[1];
+          nameToPwd = {};
+          let dup = 0, blank = 0;
+          for (const row of rows) {
+            const n = String(row[nameKey] || '').trim();
+            const p = String(row[pwdKey]  || '');
+            if (!n) continue;
+            if (n in nameToPwd) dup++;
+            nameToPwd[n] = p;
+            if (!p) blank++;
+          }
+          const pdfBaseNames = new Set(batchPdfFiles.map(f => f.name));
+          const matched = [], unmatchedPdfs = [];
+          for (const pdf of batchPdfFiles) {
+            if (nameToPwd[pdf.name] !== undefined) matched.push(pdf.name);
+            else unmatchedPdfs.push(pdf.name);
+          }
+          const unusedCsv = Object.keys(nameToPwd).filter(k => !pdfBaseNames.has(k));
+
+          let info = `✅ 读取 <b>${rows.length}</b> 行 · 有效 <b>${Object.keys(nameToPwd).length}</b> 条 · 列：<code>${nameKey}</code> / <code>${pwdKey}</code>`;
+          if (dup)   info += ` · <span style="color:#c88400">${dup} 个重复 name 被覆盖</span>`;
+          if (blank) info += ` · <span style="color:#c0392b">${blank} 个空密码</span>`;
+          if (batchPdfFiles.length > 0) {
+            info += `<br>📋 匹配：<b style="color:#060">${matched.length}</b> / ${batchPdfFiles.length} 个 PDF`;
+            if (unmatchedPdfs.length > 0) info += ` · <span style="color:#c88400">${unmatchedPdfs.length} 个 PDF 找不到密码（将被跳过）</span>`;
+            if (unusedCsv.length > 0)    info += ` · <span style="color:#888">${unusedCsv.length} 个 CSV 记录没有对应 PDF</span>`;
+          } else {
+            info += `<br><span style="color:#c88400">⚠️ 还没选 PDF，请先完成第 ① 步</span>`;
+          }
+          csvInfo.innerHTML = info;
+          csvInfo.classList.remove('hidden');
+          checkBatchReady();
+        } catch (err) {
+          csvInfo.innerHTML = '❌ 解析失败：' + escapeHtml(err.message);
+          csvInfo.classList.remove('hidden');
+          nameToPwd = {}; checkBatchReady();
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function checkBatchReady() {
+      const hasPdf = batchPdfFiles.length > 0;
+      const hasCsv = Object.keys(nameToPwd).filter(k => nameToPwd[k]).length > 0;
+      const hasOwner = batchOwnerPass.value && batchOwnerPass.value.length > 0;
+      batchStartBtn.disabled = !(hasPdf && hasCsv && hasOwner && window.__encryptPDF);
+    }
+    batchOwnerPass.addEventListener('input', checkBatchReady);
+    // 引擎加载完后再检查一次
+    const _checkInterval = setInterval(() => {
+      if (window.__encryptPDF) {
+        if (batchPdfFiles.length > 0) genCsvBtn.disabled = false;
+        checkBatchReady();
+        clearInterval(_checkInterval);
+      }
+    }, 100);
+
+    function findPwd(pdfName) {
+      const p = nameToPwd[pdfName];
+      return (p && p.length > 0) ? p : undefined;
+    }
+
+    batchStartBtn.addEventListener('click', async () => {
+      if (batchPdfFiles.length === 0) return;
+      const ownerPwd = batchOwnerPass.value;
+      if (!ownerPwd) { alert('请先在高级设置里输入管理员密码'); return; }
+      batchStartBtn.disabled = true;
+      batchProgressBox.classList.remove('hidden');
+      batchStatusEl.classList.remove('hidden');
+      batchResultsEl.classList.add('hidden');
+      batchResultsEl.innerHTML = '';
+
+      const zip = new JSZip();
+      const ok = [], failed = [], missed = [];
+
+      for (let i = 0; i < batchPdfFiles.length; i++) {
+        const item = batchPdfFiles[i];
+        const label = `${i + 1} / ${batchPdfFiles.length}：${item.name}`;
+        batchStatusEl.textContent = `加密中 ${label}`;
+        batchProgressBar.style.width = `${((i + 1) / batchPdfFiles.length) * 100}%`;
+
+        const pwd = findPwd(item.name);
+        if (!pwd) {
+          missed.push({ name: item.name, reason: 'CSV 中找不到对应 name 或 password 为空' });
+          continue;
+        }
+        try {
+          const out = await encryptOne(item.file, pwd, ownerPwd, getPermissionsFromUI(''));
+          zip.file(item.name, out);
+          ok.push(item.name);
+        } catch (err) {
+          console.error(err);
+          failed.push({ name: item.name, reason: err.message || String(err) });
+        }
+        if (i % 3 === 2) await new Promise(r => setTimeout(r, 0));
+      }
+
+      batchStatusEl.textContent = `完成：✅ ${ok.length} · ❌ ${failed.length} · ⚠️ 未匹配 ${missed.length}`;
+      let html = '';
+      if (ok.length) {
+        html += `<details open><summary class="ok">✅ 成功 ${ok.length} 个</summary>`;
+        ok.forEach(n => { html += `<div class="item">📄 ${escapeHtml(n)}</div>`; });
+        html += `</details>`;
+      }
+      if (failed.length) {
+        html += `<details open><summary class="err">❌ 失败 ${failed.length} 个</summary>`;
+        failed.forEach(f => { html += `<div class="item">📄 ${escapeHtml(f.name)} — ${escapeHtml(f.reason)}</div>`; });
+        html += `</details>`;
+      }
+      if (missed.length) {
+        html += `<details open><summary class="miss">⚠️ 未匹配 ${missed.length} 个</summary>`;
+        missed.forEach(f => { html += `<div class="item">📄 ${escapeHtml(f.name)} — ${escapeHtml(f.reason)}</div>`; });
+        html += `</details>`;
+      }
+      batchResultsEl.innerHTML = html;
+      batchResultsEl.classList.remove('hidden');
+      if (ok.length > 0) {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        saveAs(blob, `encrypted_${new Date().toISOString().slice(0,10)}.zip`);
+      }
+      batchStartBtn.disabled = false;
+    });
+
+    /* ════════════════════════════════════════════════
+       单文件模式
+       ════════════════════════════════════════════════ */
+    const singlePdfInput   = document.getElementById('singlePdfInput');
+    const singleFilePill   = document.getElementById('singleFilePill');
+    const singleUserPwd    = document.getElementById('singleUserPwd');
+    const singleOwnerPass  = document.getElementById('singleOwnerPass');
+    const singleStartBtn   = document.getElementById('singleStartBtn');
+    const singleStatusEl   = document.getElementById('singleStatus');
+
+    let singleFile = null;
+
+    function renderSinglePill() {
+      if (!singleFile) {
+        singleFilePill.innerHTML = '';
+        return;
+      }
+      singleFilePill.innerHTML = `
+        <div class="file-pill">
+          <span>📄 ${escapeHtml(singleFile.name)}</span>
+          <span style="color:#888">(${(singleFile.size/1024).toFixed(1)} KB)</span>
+          <span class="x" id="singleFileClear" title="移除">×</span>
+        </div>`;
+      document.getElementById('singleFileClear').addEventListener('click', () => {
+        singleFile = null;
+        singlePdfInput.value = '';
+        renderSinglePill();
+        checkSingleReady();
+      });
+    }
+    function checkSingleReady() {
+      const userPwd = singleUserPwd.value;
+      const ownerPwd = singleOwnerPass.value;
+      singleStartBtn.disabled = !(singleFile && userPwd && userPwd.length > 0 && ownerPwd && ownerPwd.length > 0 && window.__encryptPDF);
+    }
+    singleUserPwd.addEventListener('input', checkSingleReady);
+    singleOwnerPass.addEventListener('input', checkSingleReady);
+
+    setupDrop('singlePdfDrop', files => {
+      if (files.length === 0) return;
+      const pdf = files.find(f => /\.pdf$/i.test(f.name));
+      if (!pdf) { alert('请选择 .pdf 文件'); return; }
+      singleFile = pdf;
+      renderSinglePill();
+      checkSingleReady();
+    });
+
+    singleStartBtn.addEventListener('click', async () => {
+      if (!singleFile) return;
+      const userPwd = singleUserPwd.value;
+      if (!userPwd) { alert('请输入用户密码'); return; }
+      const ownerPwd = singleOwnerPass.value;
+      if (!ownerPwd) { alert('请输入管理员密码'); return; }
+
+      singleStartBtn.disabled = true;
+      singleStatusEl.classList.remove('hidden');
+      singleStatusEl.textContent = '加密中…';
+
+      try {
+        const out = await encryptOne(singleFile, userPwd, ownerPwd, getPermissionsFromUI('_single'));
+        const outName = singleFile.name.replace(/\.pdf$/i, '') + '_encrypted.pdf';
+        const blob = new Blob([out], { type: 'application/pdf' });
+        saveAs(blob, outName);
+        singleStatusEl.innerHTML = `✅ 已下载：<code>${escapeHtml(outName)}</code> · 打开密码：<code>${escapeHtml(userPwd)}</code>`;
+      } catch (err) {
+        singleStatusEl.innerHTML = `❌ 加密失败：${escapeHtml(err.message || String(err))}`;
+        console.error(err);
+      } finally {
+        singleStartBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
