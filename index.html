@@ -167,19 +167,18 @@
             </div>
 
             <div style="margin-top:14px">
-              <label class="lbl">权限细分 <span style="color:#888;font-weight:normal;font-size:12px">（取消勾选 = 禁止该操作；与单文件 tab 独立）</span></label>
+              <label class="lbl">权限细分 <span style="color:#888;font-weight:normal;font-size:12px">（勾选 = 允许该操作，默认全部禁止；与单文件 tab 独立）</span></label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-top:6px">
-                <label><input type="checkbox" id="permPrintLow" checked> 打印（低分辨率）</label>
-                <label><input type="checkbox" id="permPrintHigh" checked> 打印（高分辨率）</label>
-                <label><input type="checkbox" id="permModify" checked> 修改文档内容</label>
-                <label><input type="checkbox" id="permCopy" checked> 复制 / 提取内容</label>
-                <label><input type="checkbox" id="permAnnotate" checked> 添加 / 修改注释</label>
-                <label><input type="checkbox" id="permForm" checked> 填写表单</label>
-                <label><input type="checkbox" id="permAssemble" checked> 文档组装</label>
+                <label><input type="checkbox" id="permPrintLow"> 打印（低分辨率）</label>
+                <label><input type="checkbox" id="permPrintHigh"> 打印（高分辨率）</label>
+                <label><input type="checkbox" id="permModify"> 修改文档内容</label>
+                <label><input type="checkbox" id="permCopy"> 复制 / 提取内容</label>
+                <label><input type="checkbox" id="permAnnotate"> 添加 / 修改注释</label>
+                <label><input type="checkbox" id="permForm"> 填写表单</label>
+                <label><input type="checkbox" id="permAssemble"> 文档组装</label>
               </div>
-              <div class="hint" style="margin-top:6px">提示：高分辨率打印会自动启用低分辨率打印。表单 / 注释 / 组装 默认开启便于阅读；想严格控制就取消勾选。</div>
-              <button type="button" class="ghost" id="batchPermPreview" style="margin-top:8px">🔍 查看当前 P 字段（即将写入 PDF 的）</button>
-              <pre id="batchPermPreviewOut" style="margin-top:6px;padding:8px;background:#f5f5f5;border-radius:4px;font-size:12px;display:none"></pre>
+              <div class="hint" style="margin-top:6px">提示：默认全部禁止（最严格）。勾选 = 允许该操作。高分辨率打印会自动启用低分辨率打印。</div>
+              <button type="button" class="ghost" id="batchPermToggle" style="margin-top:6px">全选</button>
             </div>
           </div>
         </details>
@@ -227,16 +226,15 @@
           <div style="padding:8px 0">
             <div style="margin:4px 0 8px;font-size:12px;color:#666">💡 单文件 tab 的权限设置与批量 tab 完全分开，互不影响。</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-top:4px">
-              <label><input type="checkbox" id="permPrintLow_single" checked> 打印（低分辨率）</label>
-              <label><input type="checkbox" id="permPrintHigh_single" checked> 打印（高分辨率）</label>
-              <label><input type="checkbox" id="permModify_single" checked> 修改文档内容</label>
-              <label><input type="checkbox" id="permCopy_single" checked> 复制 / 提取内容</label>
-              <label><input type="checkbox" id="permAnnotate_single" checked> 添加 / 修改注释</label>
-              <label><input type="checkbox" id="permForm_single" checked> 填写表单</label>
-              <label><input type="checkbox" id="permAssemble_single" checked> 文档组装</label>
+              <label><input type="checkbox" id="permPrintLow_single"> 打印（低分辨率）</label>
+              <label><input type="checkbox" id="permPrintHigh_single"> 打印（高分辨率）</label>
+              <label><input type="checkbox" id="permModify_single"> 修改文档内容</label>
+              <label><input type="checkbox" id="permCopy_single"> 复制 / 提取内容</label>
+              <label><input type="checkbox" id="permAnnotate_single"> 添加 / 修改注释</label>
+              <label><input type="checkbox" id="permForm_single"> 填写表单</label>
+              <label><input type="checkbox" id="permAssemble_single"> 文档组装</label>
             </div>
-            <button type="button" class="ghost" id="singlePermPreview" style="margin-top:8px">🔍 查看当前 P 字段（即将写入 PDF 的）</button>
-            <pre id="singlePermPreviewOut" style="margin-top:6px;padding:8px;background:#f5f5f5;border-radius:4px;font-size:12px;display:none"></pre>
+            <button type="button" class="ghost" id="singlePermToggle" style="margin-top:6px">全选</button>
           </div>
         </details>
 
@@ -508,7 +506,7 @@
     }
 
     // ========== Main encrypt function ==========
-    async function encryptPDF_AES256(pdfBytes, userPwd, ownerPwd, permissions = 0xFFFFFFFC) {
+    async function encryptPDF_AES256(pdfBytes, userPwd, ownerPwd, permissions = 0xFFFFE584) {
       const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true, updateMetadata: false });
       const context = pdfDoc.context;
       const trailer = context.trailerInfo;
@@ -535,7 +533,7 @@
       ];
 
       // V=5 R=5 标准参数派生 (返回 K 作为文件加密密钥, 以及 O/U/OE/UE/Perms 字典字段)
-      // permissions: 32-bit 无符号整数, 由 UI 复选框生成 (默认 0xFFFFFFFC = 全开)
+      // permissions: 32-bit 无符号整数, 由 UI 复选框生成 (默认 0xFFFFE584 = 7 个 R 位全禁)
       const v5 = computeV5Parameters(userPwd, ownerPwd || userPwd, permissions, true);
       const encryptionKey = v5.K;
 
@@ -596,9 +594,9 @@
       const r = await fetch('pdfs/' + encodeURIComponent('针对主题“大数据物联网_具身智能_在学术数据库进行文献检索，....pdf'));
       const pdfBytes = new Uint8Array(await r.arrayBuffer());
       const cases = [
-        { name: 'all', P: 0xFFFFFFFC },
-        { name: 'only-print', P: (0xFFFFFFFC & ~(0x10000000|0x08000000|0x04000000|0x00800000|0x00200000)) | 0x20000000 | 0x00100000 },
-        { name: 'no-copy', P: 0xFFFFFFFC & ~(0x10000000|0x08000000) },
+        { name: 'all', P: 0xFFFFE584 | 0x1A78 },   // = 0xFFFFFFFC (7 个 R 位全勾)
+        { name: 'only-print', P: 0xFFFFE584 | 0x1008 },  // R3+R12
+        { name: 'no-copy', P: 0xFFFFE584 | 0x1A58 },   // 6 个 R 位勾但不含 R5
       ];
       const out = [];
       for (const c of cases) {
@@ -632,10 +630,10 @@
       const r = await fetch('pdfs/' + encodeURIComponent('针对主题“大数据物联网_具身智能_在学术数据库进行文献检索，....pdf'));
       const pdfBytes = new Uint8Array(await r.arrayBuffer());
       const cases = [
-        { name: 'all', P: 0xFFFFFFFC },
-        { name: 'only-print', P: (0xFFFFFFFC & ~(0x10000000|0x08000000|0x04000000|0x00800000|0x00200000)) | 0x20000000 | 0x00100000 },
-        { name: 'no-copy-no-modify', P: 0xFFFFFFFC & ~(0x10000000|0x08000000) },
-        { name: 'comment-only', P: 0xFFFFFFFC & ~(0x20000000|0x00100000|0x00800000|0x00200000) },
+        { name: 'all', P: 0xFFFFE584 | 0x1A78 },   // 7 个 R 位全勾
+        { name: 'only-print', P: 0xFFFFE584 | 0x1008 },  // R3+R12
+        { name: 'no-copy-no-modify', P: 0xFFFFE584 | 0x1A38 },   // 6 个 R 位勾但不含 R4/R5
+        { name: 'comment-only', P: 0xFFFFE584 | 0x070 },     // R4+R5+R6
       ];
       const out = [];
       for (const c of cases) {
@@ -737,9 +735,9 @@
       const flagAnn  = 0x00000040;  // R6  添加/修改注释
       const flagForm = 0x00000200;  // R9  填写表单
       const flagAsm  = 0x00000800;  // R11 文档组装
-      // 默认保留前 2 个 reserved 位（bit 1, 2）+ 最低 2 位清零（= 0xFFFFFFFC 等价 signed -4）
-      let P = 0xFFFFFFFC;
-      // 把未勾选的 bit 清掉
+      // 默认全禁基线：所有 R3/R4/R5/R6/R9/R11/R12 = 0；保留 reserved bits（R1=0, R2=1）+ R10=1（accessibility 默认开启，对残障用户友好）
+      let P = 0xFFFFE584;
+      // 勾选 = 允许该操作（set 对应 bit）
       const checkLow  = document.getElementById('permPrintLow' + suffix);
       const checkHigh = document.getElementById('permPrintHigh' + suffix);
       const checkMod  = document.getElementById('permModify' + suffix);
@@ -747,13 +745,13 @@
       const checkAnn  = document.getElementById('permAnnotate' + suffix);
       const checkForm = document.getElementById('permForm' + suffix);
       const checkAsm  = document.getElementById('permAssemble' + suffix);
-      if (checkLow && !checkLow.checked)  P &= ~flagLow;
-      if (checkHigh && !checkHigh.checked) P &= ~flagHigh;
-      if (checkMod && !checkMod.checked)  P &= ~flagMod;
-      if (checkCopy && !checkCopy.checked) P &= ~flagCopy;
-      if (checkAnn && !checkAnn.checked)  P &= ~flagAnn;
-      if (checkForm && !checkForm.checked) P &= ~flagForm;
-      if (checkAsm && !checkAsm.checked)  P &= ~flagAsm;
+      if (checkLow && checkLow.checked)    P |= flagLow;
+      if (checkHigh && checkHigh.checked)  P |= flagHigh;
+      if (checkMod && checkMod.checked)    P |= flagMod;
+      if (checkCopy && checkCopy.checked)  P |= flagCopy;
+      if (checkAnn && checkAnn.checked)    P |= flagAnn;
+      if (checkForm && checkForm.checked)  P |= flagForm;
+      if (checkAsm && checkAsm.checked)    P |= flagAsm;
       // PDF reader 行为: 允许高质量打印 ⇒ 必定允许低质量（高质是低质的超集）
       if (P & flagHigh) P |= flagLow;
       return P >>> 0;  // 转成无符号 32 位
@@ -768,70 +766,40 @@
     }
     setupPermissionSync();
 
-    // P 字段预览工具 —— 直接显示"我即将写入 PDF 的权限字段"
-    // 用户可以在加密前看到效果，避免"加完发现权限不对"的反复试错
-    function previewPermissions(suffix = '') {
+    // 全选 / 全不选 toggle 按钮：点击后把当前 tab 的 7 个 checkbox 全部翻转，
+    //   按钮文字同步切换 "全选" / "全不选"
+    //   当用户手动点单个 checkbox 后，按钮文字也跟着当前状态自动更新
+    function setupPermToggle(btnId, suffix) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
       const ids = ['permPrintLow','permPrintHigh','permModify','permCopy','permAnnotate','permForm','permAssemble'];
-      const labels = {
-        permPrintLow:   '打印（低分辨率）',
-        permPrintHigh:  '打印（高分辨率）',
-        permModify:     '修改文档内容',
-        permCopy:       '复制 / 提取',
-        permAnnotate:   '添加 / 修改注释',
-        permForm:       '填写表单',
-        permAssemble:   '文档组装',
-      };
-      const flags = {
-        permPrintLow:   0x00000008,  // R3
-        permPrintHigh:  0x00001000,  // R12
-        permModify:     0x00000010,  // R4
-        permCopy:       0x00000020,  // R5
-        permAnnotate:   0x00000040,  // R6
-        permForm:       0x00000200,  // R9
-        permAssemble:   0x00000800,  // R11
-      };
-      const lines = [];
-      lines.push('━━━ 你的复选框 ━━━');
+
+      function refreshLabel() {
+        const boxes = ids.map(id => document.getElementById(id + suffix));
+        const allChecked = boxes.every(el => el && el.checked);
+        btn.textContent = allChecked ? '全不选' : '全选';
+      }
+
+      btn.addEventListener('click', () => {
+        const boxes = ids.map(id => document.getElementById(id + suffix)).filter(Boolean);
+        const allChecked = boxes.every(el => el.checked);
+        const target = !allChecked;
+        for (const el of boxes) el.checked = target;
+        refreshLabel();
+      });
+
+      // 任意 checkbox 改变 → 按钮文字同步
       for (const id of ids) {
         const el = document.getElementById(id + suffix);
-        lines.push(`  [${el.checked ? '☑' : '☐'}] ${labels[id]}  → 在 PDF reader 里 "${labels[id].split(' ')[0]}"复选框会${el.checked ? '☑（允许）' : '☐（禁止）'}`);
+        if (el) el.addEventListener('change', refreshLabel);
       }
-      const P = getPermissionsFromUI(suffix);
-      lines.push('');
-      lines.push('━━━ 32-bit P 字段 ━━━');
-      lines.push(`  0x${(P >>> 0).toString(16).toUpperCase().padStart(8, '0')}`);
-      lines.push(`  二进制: ${(P >>> 0).toString(2).padStart(32, '0')}`);
-      lines.push('');
-      lines.push('━━━ PDF reader 里看到的 ━━━');
-      lines.push('  Adobe Reader / 福昕 / WPS 的"权限"对话框：');
-      lines.push('  ☑ = 允许（bit 设 1）  ☐ = 禁止（bit 设 0）');
-      for (const id of ids) {
-        const bit = (P & flags[id]) !== 0;
-        lines.push(`    [${bit ? '☑' : '☐'}] ${labels[id]}`);
-      }
-      return lines.join('\n');
-    }
-    // 绑定两个 preview 按钮
-    (function bindPreviewBtns() {
-      const b1 = document.getElementById('batchPermPreview');
-      const o1 = document.getElementById('batchPermPreviewOut');
-      if (b1 && o1) {
-        b1.addEventListener('click', () => {
-          o1.textContent = previewPermissions('');
-          o1.style.display = o1.style.display === 'none' ? 'block' : 'none';
-        });
-      }
-      const b2 = document.getElementById('singlePermPreview');
-      const o2 = document.getElementById('singlePermPreviewOut');
-      if (b2 && o2) {
-        b2.addEventListener('click', () => {
-          o2.textContent = previewPermissions('_single');
-          o2.style.display = o2.style.display === 'none' ? 'block' : 'none';
-        });
-      }
-    })();
 
-    async function encryptOne(file, userPwd, ownerPwd, permissions = 0xFFFFFFFC) {
+      refreshLabel();  // 初始化
+    }
+    setupPermToggle('batchPermToggle', '');
+    setupPermToggle('singlePermToggle', '_single');
+
+    async function encryptOne(file, userPwd, ownerPwd, permissions = 0xFFFFE584) {
       if (!window.__encryptPDF) throw new Error('加密库未就绪');
       const bytes = new Uint8Array(await file.arrayBuffer());
       return await window.__encryptPDF(bytes, userPwd, ownerPwd || undefined, permissions);
